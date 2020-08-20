@@ -28,7 +28,7 @@ double alpha = 0.1;
 
 const int nprint = 10;
 
-std::tuple<double,double,double,double> force(double x, double y, double z) {
+auto force(double x, double y, double z) {
   double fx = 0.0; double fy = 0.0; double fz = 0.0;
   double vij = 0.0;
   double alpha_rsq = alpha*(x*x+y*y+ z*z);
@@ -41,19 +41,17 @@ std::tuple<double,double,double,double> force(double x, double y, double z) {
   return std::make_tuple(fx,fy,fz,vij);
 }
 
-std::tuple<std::vector<std::tuple<double,double,double> >,double>forces(std::vector<coord_3d> coords) {
+auto forces(std::vector<coord_3d> coords) {
   int ncoords = coords.size();
   double pe = 0.0;
   std::vector<force_3d> vforces(ncoords);
   //#pragma omp parallel for reduction(+:pe)
   for (int i = 0; i < ncoords; i++) {
-    double xi, yi, zi;
-    std::tie(xi, yi, zi) = coords[i];
+    auto [xi, yi, zi] = coords[i];
     double fxi = 0.0; double fyi = 0.0; double fzi = 0.0;
     //#pragma omp parallel for reduction(+:fxi,fyi,fzi,pe)
     for (int j = 0; j < ncoords; j++) {
-      double xj, yj, zj;
-      std::tie(xj, yj, zj) = coords[j];
+      auto [xj, yj, zj] = coords[j];
       auto dx = xi-xj;
       auto dy = yi-yj;
       auto dz = zi-zj;
@@ -63,8 +61,7 @@ std::tuple<std::vector<std::tuple<double,double,double> >,double>forces(std::vec
       else if (dy < -L/2) dy += L;
       if (dz > L/2) dz -= L;
       else if (dz < -L/2) dz += L;
-      double fx, fy, fz, vij;
-      std::tie(fx, fy, fz, vij) = force(dx,dy,dz);
+      auto [fx, fy, fz, vij] = force(dx,dy,dz);
       pe += vij;
       fxi += fx; fyi += fy; fzi += fz;
     }
@@ -73,8 +70,7 @@ std::tuple<std::vector<std::tuple<double,double,double> >,double>forces(std::vec
   return std::make_tuple(vforces,pe);
 }
 
-//auto forces(std::vector<coord_3d> coords) {
-std::tuple<std::vector<std::tuple<double,double,double> >,double>forces_tiled(std::vector<coord_3d> coords, int tsize = 120) {
+auto forces_tiled(std::vector<coord_3d> coords, int tsize = 120) {
   int ncoords = coords.size();
   double pe = 0.0;
   std::vector<force_3d> vforces(ncoords);
@@ -84,12 +80,10 @@ std::tuple<std::vector<std::tuple<double,double,double> >,double>forces_tiled(st
     int jmax = std::min(jj+tsize, ncoords);
       #pragma omp for 
       for (int i = ii; i < imax; i++) {
-        double xi, yi, zi;
-        std::tie(xi, yi, zi) = coords[i];
+        auto [xi, yi, zi] = coords[i];
         double fxi = 0.0; double fyi = 0.0; double fzi = 0.0;
         for (int j = jj; j < jmax; j++) {
-          double xj, yj, zj;
-          std::tie(xj, yj, zj) = coords[j];
+          auto [xj, yj, zj] = coords[j];
           auto dx = xi-xj;
           auto dy = yi-yj;
           auto dz = zi-zj;
@@ -99,8 +93,7 @@ std::tuple<std::vector<std::tuple<double,double,double> >,double>forces_tiled(st
           else if (dy < -L/2) dy += L;
           if (dz > L/2) dz -= L;
           else if (dz < -L/2) dz += L;
-          double fx, fy, fz, vij;
-          std::tie(fx, fy, fz, vij) = force(dx,dy,dz);
+          auto [fx, fy, fz, vij] = force(dx,dy,dz);
           pe += vij;
           fxi += fx; fyi += fy; fzi += fz;
         }
@@ -137,11 +130,10 @@ void write_positions_to_file(const std::string& fname, const std::vector<coord_3
   int natoms = coords.size();
   int natoms2 = vels.size();
   assert(natoms == natoms2);
-  double x, y, z, vx, vy, vz;
   fil << natoms2 << std::endl;
   for (int i = 0; i < natoms; i++) {
-    std::tie(x, y, z) = coords[i];
-    std::tie(vx, vy, vz) = vels[i];
+    auto [x, y, z] = coords[i];
+    auto [vx, vy, vz] = vels[i];
     fil.width(20);
     fil << std::scientific;
     fil << x << " ";
@@ -181,20 +173,15 @@ void create_particles(std::vector<coord_3d>& coords, std::vector<vel_3d>& vels) 
 }
 
 void iterate(const int& nsteps, std::vector<coord_3d>& coords, std::vector<vel_3d>& vels) {
-  std::vector<force_3d> f; double pe;
-  //tie(f, pe) = forces_tiled(coords);
-  std::tie(f, pe) = forces(coords);
+  auto [f, pe] = forces(coords);
   for (auto istep = 0; istep < nsteps; istep++) {
     for (auto i = 0; i < natoms; i++) {
       // get position 
-      double x, y, z;
-      std::tie(x, y, z) = coords[i];
+      auto [x, y, z] = coords[i];
       // get velocity
-      double vx, vy, vz;
-      std::tie(vx, vy, vz) = vels[i];
+      auto [vx, vy, vz] = vels[i];
       // get forces
-      double fx, fy, fz;
-      std::tie(fx, fy, fz) = f[i];
+      auto [fx, fy, fz] = f[i];
       // update velocities at t + dt/2
       vx += fx*dt*0.5;
       vy += fy*dt*0.5;
@@ -214,7 +201,6 @@ void iterate(const int& nsteps, std::vector<coord_3d>& coords, std::vector<vel_3
       vels[i] = std::make_tuple(vx,vy,vz);
     }
     auto ke = 0.0;
-    //std::tie(f, pe) = forces_tiled(coords);
     std::tie(f, pe) = forces(coords);
     for (int i = 0; i < natoms; i++) {
       // get force
@@ -271,15 +257,13 @@ void test() {
   std::vector<coord_3d> vels_init(vels);
   iterate(nsteps, coords, vels);
   for (int i = 0; i < natoms; i++) {
-    double vx, vy, vz;
-    std::tie(vx, vy, vz) = vels[i];
+    auto [vx, vy, vz] = vels[i];
     vx = -vx; vy = -vy; vz = -vz;
     vels[i] = std::make_tuple(vx,vy,vz);
   }
   iterate(nsteps, coords, vels);
   for (int i = 0; i < natoms; i++) {
-    double x1, y1, z1, x2, y2, z2;
-    std::tie(x1,y1,z1) = coords[i]; std::tie(x2,y2,z2) = coords_init[i];
+    auto [x1,y1,z1] = coords[i]; auto [x2,y2,z2] = coords_init[i];
     double xerr = x1-x2; double yerr = y1-y2; double zerr = z1-z2;
     printf("%15.8f %15.8f %15.8f %15.8f %15.8f %15.8f %15.8f %15.8f %15.8f\n", x1, x2, xerr, y1, y2, yerr, z1, z2, zerr);
   }
